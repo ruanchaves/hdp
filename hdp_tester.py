@@ -1,30 +1,24 @@
-from hdp_driver import preprocess, Process, TFIDF, HDP
+from hdp_driver import build_data, DF, HDP
 
-seed_filename = 'pgp_seed.txt'
-stream_filename = 'pgp_rest.txt'
+seed = DF('pgp_seed.csv',['title','text'],threshold=0.01)
+seed.run()
+stream = DF('pgp_rest.csv',['title','text'],threshold=0.01)
+stream.run()
 
-#Remove the top 5% TF-IDF words from the corpus.
-#If no trim_top is specified, it will be set to 2,5% by default.
-seed = preprocess(seed_filename,trim_top=5)
-stream = preprocess(stream_filename,trim_top=5)
+dct, corpus = build_data(seed.df['tokenized'],stream.df['tokenized'])
 
-#Run HDP and discard topics with alpha below 0.007.
-hdp = HDP(seed,stream,threshold=0.007)
-hdp.build_hdp()
+hdp = HDP(corpus,dct,stream.df)
+hdp.build_lda()
+hdp.build_topic_dist()
 
-#Print how many topics we've got.
-hdp.update_topics()
-print(len(hdp.topics))
+similar = hdp.similarity_query(300)
 
-#Create a spreadsheet with the top 40 words from each topic, one topic per line.
-hdp.print_table(topn=40,filename='data.csv')
+print('QUERY: \n')
 
-#Identify the topics in a document with HDP.
-tpc1 = hdp.build_topics('test1.txt')
-tpc2 = hdp.build_topics('test2.txt')
+print(stream.df['text'][300])
 
-#Plot how much the document fits into each topic.
-hdp.plot(tpc1,'test1.png')
-hdp.plot(tpc2,'test2.png')
+print('SIMILAR LETTERS: \n')
 
-
+for index in similar:
+	print('=== \n')
+	print(stream.df['text'][index])
