@@ -1,193 +1,148 @@
-import nltk
-import re
-import string
-from nltk.stem import PorterStemmer, SnowballStemmer
-from nltk.stem.wordnet import WordNetLemmatizer
-import numpy as np
-import pandas as pd
-import csv
-
-#TFIDF
+from gensim import models, corpora, similarities
+from gensim.models import LdaModel
 from gensim.models import TfidfModel
-
-#HDP
 from gensim.corpora import Dictionary
 from gensim.models.hdpmodel import HdpModel
 
-#LDA
-from gensim.models import LdaModel
+from nltk.corpus import stopwords
+from nltk import FreqDist
+from nltk.stem.porter import PorterStemmer
+from nltk.stem.wordnet import WordNetLemmatizer
 
-#Plotting
+from scipy.stats import entropy
+
+import gensim
+
+import matplotlib
 import matplotlib.pyplot as plt
 
-class Process(object):
+import nltk
+import numpy as np
 
-	def __init__(self,filename):
-		with open(filename,'r') as f:
-			s = f.read().split('\n')
-		self.result = s
-	
-	def tokenize(self):
-		for i,j in enumerate(self.result):
-			self.result[i] = nltk.word_tokenize(j)
+import pandas as pd
 
-	def lowercase(self):
-		for i,j in enumerate(self.result):
-			self.result[i] = [token.lower() for token in j]
+import re
 
-	def remove_blanks(self):
-		for i,j in enumerate(self.result):
-			self.result[i] = [token.strip() for token in j]
+import seaborn as sns
 
-	def remove_punctuation(self):
-		for i,j in enumerate(self.result):
-			pattern = re.compile('[{}]'.format(re.escape(string.punctuation)))
-			self.result[i] = list(filter(None, [pattern.sub('',token) for token in j]))
+import string
+import sys
+import time
 
-	def remove_stopwords(self):
-		stopwords = nltk.corpus.stopwords.words('english')
-		for i,j in enumerate(self.result):
-			self.result[i] = [w for w in j if w not in stopwords]
-	
-	def stemmer(self,stemmer='porter'):
-		if stemmer == 'porter':
-			s = PorterStemmer()
-		elif stemmer == 'snowball':
-			s = SnowBallStemmer("english")
-		for i,j in enumerate(self.result):
-			self.result[i] = [s.stem(w) for w in j]
+sns.set_style("darkgrid")
 
-	def lemmatizer(self):
-		lem = WordNetLemmatizer()
-		for i,j in enumerate(self.result):
-			self.result[i] = [ lem.lemmatize(w) for w in j]
+class DF(object):
 
-	def all(self):
-		self.tokenize()
-		self.lowercase()
-		self.remove_blanks()
-		self.remove_punctuation()
-		self.remove_stopwords()
-		self.stemmer()
-		self.lemmatizer()
+	def __init__(self,filename,column_list,threshold=0.025):
+		self.df = pd.read_csv(filename,sep='\t',usecols=column_list)
+		self.df = self.df[self.df['text'].map(type) == str]
+		self.df['title'].fillna(value="", inplace=True)
+		self.df.dropna(axis=0,inplace=True, subset=['text'])
+		self.df = self.df.sample(frac=1.0)
+		self.df.reset_index(drop=True,inplace=True)
+		self.df.head()
 
-class TFIDF(object):
-
-	def __init__(self,data,threshold=2.5):
-		self.data = data
-		self.corpus = []
-		self.dct = Dictionary()
-		self.threshold = threshold
+		self.corpus = None
+		self.dct = None
 		self.stopwords = []
-		self.result = []
+		self.threshold = threshold
+
+	def tokenize(self,text):
+			return nltk.word_tokenize(text)
+
+	def lowercase(self,text):
+			return [token.lower() for token in text]
+
+	def remove_blanks(self,text):
+			return [token.strip() for token in text]
+
+	def remove_punctuation(self,text):
+		pattern = re.compile('[{}]'.format(re.escape(string.punctuation)))
+		return list(filter(None, [pattern.sub('',token) for token in text]))
+
+	def remove_stopwords(self,text):
+		sw = nltk.corpus.stopwords.words('english')
+		if self.stopwords:
+			sw += self.stopwords
+		return [w for w in text if w not in sw]
 	
-	def get_stopwords(self):
-		for line in self.data:
-			self.dct.add_documents([line])
-		for line in self.data:
-			self.corpus.append(self.dct.doc2bow(line))
-		tfidf = TfidfModel(self.corpus)
-		for i in range(len(self.corpus)):
-			vector = tfidf[self.corpus[i]]
-			for j,w in enumerate(vector):
-				vector_tfidf = w[0] * w[1]
-				word = self.data[i][j]
-				item = (vector_tfidf, word)
-				self.stopwords.append(item)
-		self.stopwords = sorted(self.stopwords, key=lambda x: x[0])[::-1]
+	def stemmer(self,text):
+		s = PorterStemmer()
+		return [s.stem(w) for w in text]
+
+	def lemmatizer(self,text):
+		lem = WordNetLemmatizer()
+		return [ lem.lemmatize(w) for w in text]
+
+	def clean_all(self,text):
+		tokens = self.tokenize(text)
+		tokens = self.remove_punctuation(self.remove_blanks(self.lowercase(tokens)))
+		tokens = self.lemmatizer(self.stemmer(self.remove_stopwords(tokens)))
+		return tokens
+
+	def process(self):
+		self.df['tokenized'] = self.df['text'].apply(self.clean_all) + self.df['title'].apply(self.clean_all)
+
 	
-	def del_stopwords(self):
-		percent = self.threshold / 100
-		index = int(percent * len(self.stopwords))
-		stopwords_trimmed = [ self.stopwords[i][1] for i in range(index) ]
-		for i,j in enumerate(self.data):
-			self.data[i] = [w for w in j if w not in stopwords_trimmed]
-	
-	def all(self):
+	def get_stopwords(self):	
+		all_words = [word for item in list(self.df['tokenized']) for word in item]
+		fdist = FreqDist(all_words)
+		self.stopwords = fdist.most_common(int(len(fdist) * self.threshold))
+		self.stopwords = [ x[0] for x in self.stopwords ]
+
+	def apply_stopwords(self):
+		self.df['tokenized'] = self.df['tokenized'].apply(self.remove_stopwords)
+
+	def run(self):
+		self.process()
 		self.get_stopwords()
-		self.del_stopwords()
+		self.apply_stopwords()
+
 
 class HDP(object):
 
-	def __init__(self,seed,stream,threshold=0.008):
-		self.seed = seed
-		self.stream = stream
-		self.threshold = threshold
-		
-		self.dct = Dictionary()
-		self.corpus = []
-		self.model = None
-		self.topics = None
+	def __init__(self,corpus,dct,df):
+		self.dct = dct
+		self.corpus = corpus
+		self.model = HdpModel(corpus,dct)
+		self.df = df
+		self.lda = None
+		self.topic_dist = None
 
-	def build_hdp(self):
-		for line in self.seed:
-			if line:
-				self.dct.add_documents([line])
-		for line in self.stream:
-			if line:
-				self.corpus.append(self.dct.doc2bow(line))
-		self.model = HdpModel(self.corpus,self.dct)
-		return self.model
+	def build_lda(self):
+		self.lda = self.model.suggested_lda_model()
 
-	def update_topics(self):
-		alpha = self.model.hdp_to_lda()[0]
-		self.topics = []
-		for index,item in enumerate(alpha):
-			if item > self.threshold:
-				self.topics.append(index)
-	
-	def print_table(self,topn=40,filename='data.csv'):
-		result = []
-		final_result = []
-		for index in self.topics:
-			result.append( self.model.print_topic(index,topn=40))
-		for i in result:
-			temp = i.split('+')
-			np_list = []
-			for j in temp:
-				np_list.append(" ".join(re.findall("[a-zA-Z]+",j)))
-			final_result.append(np_list)
-		with open(filename,"w") as f:
-			wr = csv.writer(f)
-			for row in final_result:
-				wr.writerow(row)
+	def build_topic_dist(self):
+		self.topic_dist = []
+		for lst in self.lda[self.corpus]:
+			distr = np.array([0.0] * 150)
+			for tup in lst:	
+				distr[tup[0]] = tup[1]		
+			self.topic_dist.append(distr)
 
-	def build_topics(self,filename,stopwords=None):
-		data = Process(filename)
-		data.all()
-		data = data.result
-		data_bow = []
-		for line in data:
-			if line:
-				data_bow.append(self.dct.doc2bow(line))
-		
-		final_data_bow = []
-		for line in data_bow:
-			all_topics = self.model[line]
-			all_topics = [x for x in all_topics if x[0] in self.topics]
-			if all_topics:
-				final_data_bow.append(all_topics)
-		return final_data_bow
+	def jensen_shannon(self,query, matrix):
+		p = query
+		q = matrix
+		m = 0.5*(p+q)
+		E1 = entropy(p,m)
+		E2 = entropy(q,m)
+		E = E1 + E2
+		return np.sqrt(0.5*E)
 
-	def plot(self,topics,filename):
-		fig = plt.figure()
-		ax = fig.add_subplot(111)
-		xaxis = np.arange(151)
-		yaxis = [0] * 151
-		for item in topics:
-			for bow in item:
-				yaxis[bow[0]] += bow[1]
-		plt.plot(xaxis,yaxis,'bo')
-		for xy in zip(xaxis,yaxis):
-			if xy[1]:
-				ax.annotate('%s' % xy[0], xy=xy, textcoords='data')
-		plt.grid()
-		plt.savefig(filename)
+	def similarity(self,query,matrix,k=10):
+		sims = []
+		for index,item in enumerate(matrix):
+			sims.append(self.jensen_shannon(query,matrix[index]))
+		sims = np.array(sims)
+		return sims.argsort()[:k]
 
-def preprocess(filename,trim_top=2.5):
-	data = Process(filename)
-	data.all()
-	data = data.result
-	tfidf = TFIDF(data,threshold=trim_top)
-	tfidf.all()
-	return tfidf.data
+	def similarity_query(self,index,k=10,n=2):
+		bow = self.dct.doc2bow(self.df.iloc[index,n])
+		doc_distribution = np.array([0.0] * 150)
+		for tup in self.lda.get_document_topics(bow=bow):
+			doc_distribution[tup[0]] = tup[1]
+		return self.similarity(doc_distribution,self.topic_dist,k)
+
+def build_data(df_dct,df_corpus):
+	dct = Dictionary(df_dct)
+	return dct, [dct.doc2bow(doc) for doc in df_corpus]
