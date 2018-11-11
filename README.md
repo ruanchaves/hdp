@@ -1,6 +1,6 @@
 ## HDP clusters
 
-Here is the output of t-SNE dimensionality reduction applied to 90-dimensional topic vectors produced by [gensim's Hierarchical Dirichlet Process](https://radimrehurek.com/gensim/models/hdpmodel.html). t-distributed Stochastic Neighbor Embedding is applied twice, once for 90-dimensions to 2D and once for 90-dimensions to 3D. 2D results are interpreted as x,y-coordinates and 3D results are interpreted as colors. Although a human can certainly see the clusters, a computer only knows colored x,y-points so it can't deliver the clusters upon request.
+Here is the output of t-distributed Stochastic Neighbor Embedding dimensionality reduction applied to 90-dimensional topic vectors produced by [gensim's Hierarchical Dirichlet Process](https://radimrehurek.com/gensim/models/hdpmodel.html). t-SNE is applied twice, once for 90-dimensions to 2D and once for 90-dimensions to 3D. 2D results are interpreted as x,y-coordinates and 3D results are interpreted as colors. Although a human can certainly see the clusters, a computer only knows colored x,y-points so it can't deliver the clusters upon request.
 
 ![](https://i.imgur.com/3Zgeqqa.png)
 
