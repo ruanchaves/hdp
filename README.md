@@ -16,7 +16,7 @@ Here are the connected components when the tolerance is even lower.
 
 ![](https://i.imgur.com/eoIApzU.png)
 
-This means our users won't have to directly deal with this map. When they request a certain document, they'll get a list of similar documents, that is, a list of points sorted according to their distance from the chosen point. And then they'll be able to select cluster colors ( categories ) to filter out the results.
+This means our users won't have to directly deal with this map. When they request a certain document, they'll get a list of similar documents, that is, a list of points sorted according to their distance from the chosen point. And then they'll be able to select cluster colors ( topic categories ) to filter out the results.
 
 ## Related sources
 
