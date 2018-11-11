@@ -16,6 +16,6 @@ Here are the connected components when the tolerance is even lower.
 
 This means our users won't have to directly deal with this map. When they request a certain document, they'll get a list of similar documents, that is, a list of points sorted according to their distance from the chosen point. And then they'll be able to select cluster colors ( categories ) to filter out the results.
 
-#Related links
+# Related links
 
-[Topic Modeling and t-SNE Visualization](Topic Modeling and t-SNE Visualization)
+![Topic Modeling and t-SNE Visualization](Topic Modeling and t-SNE Visualization)
