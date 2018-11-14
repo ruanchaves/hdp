@@ -9,9 +9,9 @@ from collections import Counter
 
 def stopwords(nlp, percent):
 	words = [ token.text for token in nlp if token.is_stop != True and token.is_punct != True ]
-	stopwords = [ token.text for token in nlp if token.is_stop ]
+	standard = [ token.text for token in nlp if token.is_stop ]
 	word_freq = Counter(words)
-	return word_freq.most_common( percent * len(words) )
+	return word_freq.most_common( percent * len(words) ) + standard
 
 class BagLine(object):
 	
@@ -89,10 +89,6 @@ class Document(object):
 		self.lemma = lemma
 		self.tokens = tokens
 		self.text = text
-		self.snippet = 0
-
-	def update(self, snippet_size):
-		self.snippet = self.index // snippet_size 
 
 class Parser(object):
 	
@@ -129,12 +125,3 @@ class Parser(object):
 		self.run()
 		self.parse_pool()
 		return self.doc_list
-
-class Controller(object):
-	
-	def __init__(self, dirname, nlp, blocksize=BAG_BLOCK_SIZE, blocklimit=BAG_LIMIT):
-		self.pcontroller = ParserController(dirname, nlp, blocksize=blocksize, blocklimit=blocklimit)
-	
-	def __iter__(self):
-		for parsed_item in self.pcontroller:
-			
