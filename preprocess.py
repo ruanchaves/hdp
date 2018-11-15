@@ -3,8 +3,6 @@ import base64
 import os
 import sys
 from dask.bag import read_text
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import cpu_count
 from collections import Counter	
 
 def stopwords(nlp, percent):
@@ -54,7 +52,7 @@ class FolderReader(object):
 				block_list[index] = bag.block_counter
 				yield line		
 
-class ParserController(object):
+class Controller(object):
 
 	def __init__(self, dirname, nlp, blocksize=BAG_BLOCK_SIZE, blocklimit=BAG_LIMIT):
 		self.reader = FolderReader(dirname, blocksize)
@@ -79,17 +77,6 @@ class ParserController(object):
 				self.reader.reset()
 				self.reset()
 
-
-class Document(object):
-
-	def __init__(self, index, fname, byte, lemma, tokens, text):
-		self.index = index
-		self.fname = fname
-		self.bytes = byte
-		self.lemma = lemma
-		self.tokens = tokens
-		self.text = text
-
 class Parser(object):
 	
 	def __init__(self, nlp, flist, lines ):
@@ -97,31 +84,12 @@ class Parser(object):
 		self.nlp = nlp
 		self.files = flist
 		self.text = [ ( bagline.text, (bagline.index, bagline.fname) ) for bagline in lines ]
-		self.doc_list = { x : {} for x in flist }
 		self.docs = []
 
 	def run(self,batch_size=10**4):
 		for doc in self.nlp.pipe(self.text, as_tuples=True, batch_size=batch_size):
-			self.docs.append(doc)
-
-	def parse_worker(self, doc, i):
-		doc_object = self.docs[i][0]
-
-		doc_index = self.docs[i][1][0]
-		doc_fname = self.docs[i][1][1]
-		doc_bytes = base64.encodestring(doc_object.to_bytes())
-		doc_lemma = [ token.lemma_.lower() for token in doc_object ]
-		doc_lemma = [ x for x in doc_lemma if doc_object.is_stop != True and doc_object.is_punct != True ]
-		doc_tokens = doc_object.print_tree(flat=True)
-		doc_text = doc_object.text
-		fields = (doc_index, doc_fname, doc_bytes, doc_lemma, doc_tokens, doc_text)
-		self.docs.append(Document(*fields))
-
-	def parse_pool(self,chunksize=POOL_CHUNK_SIZE):
-		with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-			executor.map(parse, [ x for x in range(len(self.docs)) ], chunksize=chunksize )
+			self.docs.append( [ base64.encodestring(doc[0].to_bytes()) , doc[1][0] , doc[1][1] ] )
 	
 	def __call__(self):
 		self.run()
-		self.parse_pool()
-		return self.doc_list
+		return self.docs
